@@ -2,7 +2,6 @@ import re
 from dataclasses import dataclass
 from typing import Any, List, Optional, Sequence, Tuple
 
-
 SQLITE_TO_MYSQL_TYPES = {
     "INT": "int",
     "INTEGER": "int",
@@ -43,9 +42,9 @@ def strip_sql(action: str) -> str:
 
 def normalize_identifier(identifier: str) -> str:
     identifier = strip_sql(identifier)
-    identifier = identifier.strip("`\"[]")
+    identifier = identifier.strip('`"[]')
     if "." in identifier:
-        identifier = identifier.split(".")[-1].strip("`\"[]")
+        identifier = identifier.split(".")[-1].strip('`"[]')
     return identifier
 
 
@@ -55,24 +54,24 @@ def quote_sqlite_string(value: str) -> str:
 
 def translate_mysql_probe(action: str) -> TranslatedSql:
     sql = strip_sql(action)
-
-    match = re.fullmatch(r"(?is)USE\s+([`\"\[]?[\w.-]+[`\"\]]?)", sql)
+    match = re.fullmatch('(?is)USE\\s+([`\\"\\[]?[\\w.-]+[`\\"\\]]?)', sql)
     if match:
-        return TranslatedSql(sql="", kind="use", db_name=normalize_identifier(match.group(1)))
-
-    match = re.fullmatch(r"(?is)SHOW\s+TABLES(?:\s+FROM\s+([`\"\[]?[\w.-]+[`\"\]]?))?", sql)
+        return TranslatedSql(
+            sql="", kind="use", db_name=normalize_identifier(match.group(1))
+        )
+    match = re.fullmatch(
+        '(?is)SHOW\\s+TABLES(?:\\s+FROM\\s+([`\\"\\[]?[\\w.-]+[`\\"\\]]?))?', sql
+    )
     if match:
         db_name = normalize_identifier(match.group(1)) if match.group(1) else None
         return TranslatedSql(
-            sql=(
-                "SELECT name FROM sqlite_master "
-                "WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
-            ),
+            sql="SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
             kind="show_tables",
             db_name=db_name,
         )
-
-    match = re.fullmatch(r"(?is)(?:DESC|DESCRIBE)\s+([`\"\[]?[\w.-]+[`\"\]]?)", sql)
+    match = re.fullmatch(
+        '(?is)(?:DESC|DESCRIBE)\\s+([`\\"\\[]?[\\w.-]+[`\\"\\]]?)', sql
+    )
     if match:
         table = normalize_identifier(match.group(1))
         return TranslatedSql(
@@ -80,8 +79,9 @@ def translate_mysql_probe(action: str) -> TranslatedSql:
             kind="describe",
             table_name=table,
         )
-
-    match = re.fullmatch(r"(?is)SHOW\s+COLUMNS\s+FROM\s+([`\"\[]?[\w.-]+[`\"\]]?)", sql)
+    match = re.fullmatch(
+        '(?is)SHOW\\s+COLUMNS\\s+FROM\\s+([`\\"\\[]?[\\w.-]+[`\\"\\]]?)', sql
+    )
     if match:
         table = normalize_identifier(match.group(1))
         return TranslatedSql(
@@ -89,18 +89,17 @@ def translate_mysql_probe(action: str) -> TranslatedSql:
             kind="describe",
             table_name=table,
         )
-
     return TranslatedSql(sql=translate_mysql_sql(sql), kind="sql")
 
 
 def translate_mysql_sql(sql: str) -> str:
     sql = strip_sql(sql)
-    sql = re.sub(r"`([^`]+)`", r'"\1"', sql)
-    sql = re.sub(r"(?is)\bTRUE\b", "1", sql)
-    sql = re.sub(r"(?is)\bFALSE\b", "0", sql)
-    sql = re.sub(r"(?is)\bCURDATE\(\)", "date('now')", sql)
-    sql = re.sub(r"(?is)\bNOW\(\)", "datetime('now')", sql)
-    sql = re.sub(r"(?is)\bIFNULL\s*\(", "COALESCE(", sql)
+    sql = re.sub("`([^`]+)`", '"\\1"', sql)
+    sql = re.sub("(?is)\\bTRUE\\b", "1", sql)
+    sql = re.sub("(?is)\\bFALSE\\b", "0", sql)
+    sql = re.sub("(?is)\\bCURDATE\\(\\)", "date('now')", sql)
+    sql = re.sub("(?is)\\bNOW\\(\\)", "datetime('now')", sql)
+    sql = re.sub("(?is)\\bIFNULL\\s*\\(", "COALESCE(", sql)
     return sql
 
 
@@ -108,7 +107,7 @@ def sqlite_type_to_mysql(declared_type: Any) -> str:
     raw = str(declared_type or "").strip()
     if not raw:
         return "text"
-    base = re.split(r"[\s(]", raw, maxsplit=1)[0].upper()
+    base = re.split("[\\s(]", raw, maxsplit=1)[0].upper()
     mapped = SQLITE_TO_MYSQL_TYPES.get(base)
     if mapped:
         suffix = raw[len(base) :] if raw.upper().startswith(base) else ""

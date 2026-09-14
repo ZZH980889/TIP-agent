@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Tuple
 
 try:
     from scipy.stats import kendalltau
-except Exception:  # pragma: no cover - fallback for minimal installs.
+except Exception:
     kendalltau = None
 
 
@@ -25,29 +25,30 @@ def sql_iou_reward(agent_obs: Any, eval_obs: Any) -> Tuple[float, Dict[str, Any]
     info: Dict[str, Any] = {"agent_obs": agent_obs, "eval_obs": eval_obs}
     if not isinstance(agent_obs, list) or not isinstance(eval_obs, list):
         info["reward"] = 0.0
-        return 0.0, info
-
+        return (0.0, info)
     list_agent = [str(x) for x in agent_obs]
     list_eval = [str(x) for x in eval_obs]
     dist_agent = Counter(list_agent)
     dist_eval = Counter(list_eval)
     intersection = dist_agent & dist_eval
-
-    get_key, get_val = itemgetter(0), itemgetter(1)
+    get_key, get_val = (itemgetter(0), itemgetter(1))
     merged_data = sorted(chain(dist_agent.items(), dist_eval.items()), key=get_key)
     union = {k: max(map(get_val, g)) for k, g in groupby(merged_data, key=get_key)}
-
     if len(union) == 0:
         reward = 1
     else:
-        total_intersect = sum(v for _, v in intersection.items())
-        total_union = sum(v for _, v in union.items())
+        total_intersect = sum((v for _, v in intersection.items()))
+        total_union = sum((v for _, v in union.items()))
         reward = total_intersect * 1.0 / total_union
         if len(intersection) > 0 and kendalltau is not None:
-            list_agent_intx = get_intersect_items(list_agent.copy(), intersection.copy())
+            list_agent_intx = get_intersect_items(
+                list_agent.copy(), intersection.copy()
+            )
             list_eval_intx = get_intersect_items(list_eval.copy(), intersection.copy())
-            sort_correlation = kendalltau(list_agent_intx, list_eval_intx, nan_policy="omit").statistic
+            sort_correlation = kendalltau(
+                list_agent_intx, list_eval_intx, nan_policy="omit"
+            ).statistic
             if not math.isnan(sort_correlation) and isinstance(sort_correlation, float):
                 reward = round((sort_correlation + 1.0) / 2.0 * reward, 2)
     info["reward"] = reward
-    return reward, info
+    return (reward, info)
